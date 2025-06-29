@@ -148,6 +148,22 @@
         .grade-bar-fill.low-grade {
             color: white;
         }
+
+
+         /* --- Nuevo estilo para los encabezados de grupo --- */
+         td.group-header {
+            background-color: #f0f0f0; /* Un fondo ligeramente diferente */
+            font-size: 1.1em;
+            text-align: center;
+            padding: 15px 8px; /* Más padding para que destaquen */
+            border-bottom: 2px solid #ccc; /* Una línea para separarlo */
+            border-top: 2px solid #ccc;
+        }
+
+        td.group-header h3 {
+            margin: 0; /* Elimina el margen predeterminado del h3 */
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -164,6 +180,17 @@
     <script>
         let calificacionesPorCodigo = {};
         const csvFilePath = 'datos_extraidos.csv';
+        let tablaHeaders = [];
+
+        const indicatorGroups = [
+            { name: "Proyecto de Puente Levadizo", startInd: 1, endInd: 5 },  // Ind1 a Ind5
+            { name: "Sistemas Eléctricos", startInd: 6, endInd: 10 },     // Ind6 a Ind10
+            { name: "Módulos de Comunicaciones", startInd: 11, endInd: 15 }, // Ind11 a Ind15
+            { name: "Análisis de Datos y Sensores", startInd: 16, endInd: 20 },// Ind16 a Ind20
+            { name: "Seguridad y Protocolos", startInd: 21, endInd: 25 },  // Ind21 a Ind25
+            { name: "Integración de Sistemas", startInd: 26, endInd: 29 }  // Ind26 a Ind29 (el último grupo puede ser más pequeño)
+            // Ejemplo, luego cambiar para que sea dinamico
+        ];
 
         async function cargarCSV() {
             try {
@@ -206,8 +233,7 @@
             console.log("Datos del CSV cargados:", calificacionesPorCodigo);
         }
 
-        let tablaHeaders = []; // Definida aquí para que esté disponible en el ámbito global o se pase
-
+        
         // --- NUEVA FUNCIÓN: Obtener color para la calificación ---
         function getColorForGrade(grade) {
             // Asegura que la calificación sea un número entre 0 y 10
@@ -255,37 +281,41 @@
                 
                 let tablaHTML = '<table><thead><tr><th>Indicador</th><th>Calificación</th></tr></thead><tbody>';
 
-                tablaHeaders.forEach(header => {
-                    let valor = calificaciones[header];
-                    const numValor = parseFloat(valor);
+                // --- INICIO DE LA MODIFICACIÓN IMPORTANTE AQUÍ ---
+                indicatorGroups.forEach(group => {
+                    tablaHTML += `<tr><td colspan="2" class="group-header"><h3>${group.name}</h3></td></tr>`; // Encabezado del grupo
 
-                    if (valor === null || valor === undefined || String(valor).trim() === '') {
-                        tablaHTML += `<tr><td>${header}</td><td class="highlight-empty">-</td></tr>`;
-                    } else if (isNaN(numValor)) {
-                         // Manejar si el valor no es un número pero no es null/vacío
-                         tablaHTML += `<tr><td>${header}</td><td>${valor}</td></tr>`; // Mostrar el texto tal cual
-                    }
-                    else {
-                        // Calcular ancho y color de la barra
-                        const barWidth = Math.max(0, Math.min(100, numValor * 10)); // 0-10 -> 0-100%
-                        const barColor = getColorForGrade(numValor);
-                        const textColorClass = numValor <= 3 ? 'low-grade' : ''; // Para texto blanco en fondos oscuros
+                    for (let i = group.startInd; i <= group.endInd; i++) {
+                        const header = `Ind${i}`; // Construye el nombre del indicador (ej. "Ind1", "Ind2")
+                        let valor = calificaciones[header]; // Obtiene el valor para ese indicador
+                        const numValor = parseFloat(valor);
 
-                        tablaHTML += `
-                            <tr>
-                                <td>${header}</td>
-                                <td>
-                                    <div class="grade-bar-container">
-                                        <div class="grade-bar-fill ${textColorClass}" 
-                                             style="width: ${barWidth}%; background-color: ${barColor};">
-                                            ${numValor}
+                        if (valor === null || valor === undefined || String(valor).trim() === '') {
+                            tablaHTML += `<tr><td>${header}</td><td class="highlight-empty">-</td></tr>`;
+                        } else if (isNaN(numValor)) {
+                            tablaHTML += `<tr><td>${header}</td><td>${valor}</td></tr>`;
+                        } else {
+                            const barWidth = Math.max(0, Math.min(100, numValor * 10)); // 0-10 -> 0-100%
+                            const barColor = getColorForGrade(numValor);
+                            const textColorClass = numValor <= 3 ? 'low-grade' : '';
+
+                            tablaHTML += `
+                                <tr>
+                                    <td>${header}</td>
+                                    <td>
+                                        <div class="grade-bar-container">
+                                            <div class="grade-bar-fill ${textColorClass}" 
+                                                style="width: ${barWidth}%; background-color: ${barColor};">
+                                                ${numValor}
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        `;
+                                    </td>
+                                </tr>
+                            `;
+                        }
                     }
                 });
+                // --- FIN DE LA MODIFICACIÓN IMPORTANTE AQUÍ ---
 
                 tablaHTML += '</tbody></table>';
                 resultadoDiv.innerHTML = tablaHTML;
