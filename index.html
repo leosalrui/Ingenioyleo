@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Calificaciones por Código</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start; /* Alinea al inicio verticalmente */
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 600px; /* Un poco más ancho para las tablas */
+            width: 100%;
+            margin-bottom: 20px; /* Espacio debajo del contenedor principal */
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.8em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #resultado {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 5px;
+            min-height: 50px;
+            text-align: left;
+            color: #333;
+            word-wrap: break-word;
+            overflow-x: auto; /* Permite desplazamiento horizontal si la tabla es muy ancha */
+        }
+
+        #resultado p {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+            white-space: nowrap; /* Evita que el texto de las celdas se envuelva */
+        }
+
+        th {
+            background-color: #e0e0e0;
+            font-weight: bold;
+        }
+
+        td.highlight-empty {
+            background-color: #fff3cd; /* Amarillo claro para celdas vacías */
+            color: #856404;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Buscador de Calificaciones</h1>
+        <label for="codigoInput">Introduce el código:</label>
+        <input type="text" id="codigoInput" placeholder="Ej: BIRA">
+        <button onclick="buscarCalificaciones()">Buscar</button>
+        <div id="resultado">
+            <p>Cargando datos...</p>
+        </div>
+    </div>
+
+    <script>
+        let calificacionesPorCodigo = {}; // Objeto vacío que se llenará con los datos del CSV
+        const csvFilePath = 'datos_extraidos.csv'; // Ruta a tu archivo CSV
+
+        // Función para cargar el CSV
+        async function cargarCSV() {
+            try {
+                const response = await fetch(csvFilePath);
+                if (!response.ok) {
+                    throw new Error(`Error al cargar el CSV: ${response.statusText}`);
+                }
+                const csvText = await response.text();
+                parsearCSV(csvText);
+                document.getElementById('resultado').innerHTML = '<p>Datos cargados. Introduce un código para buscar.</p>';
+            } catch (error) {
+                console.error('Error al cargar o parsear el CSV:', error);
+                document.getElementById('resultado').innerHTML = `<p class="error">Error al cargar los datos: ${error.message}. Asegúrate de que el servidor (o GitHub Pages) está funcionando y el archivo "${csvFilePath}" existe y es accesible.</p>`;
+            }
+        }
+
+        // Función para parsear el texto del CSV
+        function parsearCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length === 0) return;
+
+            // El primer encabezado (CODIGO) es la clave, el resto son los indicadores
+            const headers = lines[0].split(',').map(h => h.trim());
+            const dataHeaders = headers.slice(1); // Indicadores (Ind1, Ind2, etc.)
+
+            calificacionesPorCodigo = {}; // Reinicia el objeto
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => {
+                    const trimmed = v.trim();
+                    // Si el valor es una cadena vacía, lo convierte a null.
+                    return trimmed === '' ? null : trimmed;
+                });
+
+                const codigo = values[0]; // El primer valor es el código
+                if (codigo) { // Asegúrate de que el código no esté vacío
+                    const califs = {};
+                    for (let j = 0; j < dataHeaders.length; j++) {
+                        califs[dataHeaders[j]] = values[j + 1] !== undefined ? values[j + 1] : null;
+                    }
+                    calificacionesPorCodigo[codigo.toUpperCase()] = califs; // Guarda en mayúsculas para búsqueda consistente
+                }
+            }
+            console.log("Datos del CSV cargados:", calificacionesPorCodigo);
+        }
+
+        // Encabezados de las columnas para mostrar en la tabla (se usarán los del CSV)
+        let tablaHeaders = []; // Se llenará con Ind1, Ind2, etc., una vez que el CSV se parsea
+
+        function buscarCalificaciones() {
+            const codigoInput = document.getElementById('codigoInput');
+            const resultadoDiv = document.getElementById('resultado');
+            const codigoBuscado = codigoInput.value.trim().toUpperCase(); // Limpia espacios y convierte a mayúsculas
+
+            resultadoDiv.innerHTML = ''; // Limpia el resultado anterior
+
+            if (Object.keys(calificacionesPorCodigo).length === 0) {
+                resultadoDiv.innerHTML = '<p class="error">Los datos aún no se han cargado. Por favor, espera o recarga la página si hay un error.</p>';
+                return;
+            }
+
+            if (codigoBuscado === "") {
+                resultadoDiv.innerHTML = '<p class="error">Por favor, introduce un código.</p>';
+                return;
+            }
+
+            if (calificacionesPorCodigo.hasOwnProperty(codigoBuscado)) {
+                const calificaciones = calificacionesPorCodigo[codigoBuscado];
+
+                // Asegurarse de tener los encabezados de la tabla definidos (del primer parseo del CSV)
+                if (tablaHeaders.length === 0 && Object.keys(calificaciones).length > 0) {
+                    tablaHeaders = Object.keys(calificaciones); // Si no se han definido, usa las claves de la primera entrada de calificaciones
+                }
+                
+                // Crear una tabla para mostrar las calificaciones
+                let tablaHTML = '<table><thead><tr><th>Indicador</th><th>Calificación</th></tr></thead><tbody>';
+
+                tablaHeaders.forEach(header => {
+                    let valor = calificaciones[header];
+                    // Si el valor es null, undefined, o una cadena vacía, muestra '-'
+                    if (valor === null || valor === undefined || String(valor).trim() === '') {
+                        valor = '-';
+                        tablaHTML += `<tr><td>${header}</td><td class="highlight-empty">${valor}</td></tr>`;
+                    } else {
+                        tablaHTML += `<tr><td>${header}</td><td>${valor}</td></tr>`;
+                    }
+                });
+
+                tablaHTML += '</tbody></table>';
+                resultadoDiv.innerHTML = tablaHTML;
+
+            } else {
+                resultadoDiv.innerHTML = `<p class="error">No se encontraron calificaciones para el código: <strong>${codigoBuscado}</strong>.</p>`;
+            }
+        }
+
+        // Cargar el CSV automáticamente cuando la página termina de cargarse
+        window.onload = cargarCSV;
+    </script>
+</body>
+</html>
